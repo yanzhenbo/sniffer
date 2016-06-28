@@ -36,6 +36,7 @@
 #include <net/ethernet.h>
 #include <arpa/inet.h>
 #include <net/if_arp.h>
+#include <time.h>
 
 /* default snap length (maximum bytes per packet to capture) */
 #define SNAP_LEN 1518
@@ -79,10 +80,17 @@ struct sniff_arp {
 		u_char ar_hln;					/* Length of hardware address */
 		u_char ar_pln;					/* Length of protocol address */
 		u_short ar_op;					/* ARP opcode (command) */
+#if 0
 		u_char ar_sha[ETHER_ADDR_LEN];	/* Sender hardware address */
 		struct in_addr ar_sip;				/* Sender IP address */
 		u_char ar_tha[ETHER_ADDR_LEN];	/* Target hardware address */
 		struct in_addr ar_tip;				/* Target IP address */
+#endif
+};
+
+/* ICMP Header */
+struct sniff_icmp {
+		
 };
 
 /* TCP header */
@@ -110,15 +118,43 @@ struct sniff_tcp {
         u_short th_urp;                 /* urgent pointer */
 };
 
+/* UDP header */
+struct sniff_udp {
+		u_short uh_sport;				/* source port */
+		u_short uh_dport;				/* destination port */
+		u_short uh_ulen;				/* udp length */
+		u_short uh_checksum;			/* udp checksum */
+};
+
+/* HTTP header */
+struct sniff_http {
+
+};
+
+/* FTP header */
+struct sniff_ftp {
+
+};
+
+/* TELNET header */
+struct sniff_telnet {
+
+};
+
 void print_payload(const u_char *payload, int len);
 void print_hex_ascii_line(const u_char *payload, int len, int offset);
 void print_app_banner(void);
 void print_app_usage(void);
-void got_ip_packet(const u_char *packet, int iphdr_offset);
-void got_tcp_packet(const u_char *packet, int tcphdr_offset);
 void print_ether_addr(const u_char *packet);
-void got_arp_packet(const u_char *packet, int arphdr_offset);
-void got_rarp_packet(const u_char *packet, int rarphdr_offset);
+
+void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
+void ether_handler(const u_char *packet, int len);
+void ip_handler(const u_char *packet, int len);
+void tcp_handler(const u_char *packet, int len);
+void arp_handler(const u_char *packet, int len);
+void rarp_handler(const u_char *packet, int len);
+void udp_handler(const u_char *packet, int len);
+void http_handler(const u_char *packet, int type, int len); //type == 1 is a request, 2 is a response
 
 /*
  * app name/banner
@@ -162,7 +198,7 @@ void print_hex_ascii_line(const u_char *payload, int len, int offset)
 	const u_char *ch;
 
 	/* offset */
-	printf("%05d   ", offset);
+	printf("0x%04x   ", offset);
 	
 	/* hex */
 	ch = payload;
@@ -258,18 +294,39 @@ void print_ether_addr(const u_char *ether_addr)
  * dissect/print packet
  */
 
-void got_eth_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
+void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 {
-	static int count = 1;						/* packet counter */
+	static int count = 1;
+	static double begin_time;
+	struct pcap_stat pkt_stat;
+	if(1 == count) {
+		begin_time = header->ts.tv_sec + (double)(header->ts.tv_usec)/1000000; 
+	}
+	double relative_time = header->ts.tv_sec + (double)(header->ts.tv_usec)/1000000 - begin_time;
+	printf("\n\nPacket number: %d\tcaplen: %d\tlen: %d\n",count,  header->caplen, header->len);
+	printf("relative time: %f\n", relative_time);
 
-	/* declare pointers to packet headers  */
-	const struct sniff_ethernet *ethernet;	/* The ethernet header  */
-	
-	printf("\nPacket number %d:\n", count);
+	pcap_stats((pcap_t *)args, &pkt_stat);
+	printf("pkt recv %d\t %f Packet/s", pkt_stat.ps_recv, pkt_stat.ps_recv / (relative_time + 0.000001));
+	printf("\tpkt drop %d", pkt_stat.ps_drop);
+	printf("\tpkt if drop %d\n", pkt_stat.ps_ifdrop);
+
+	ether_handler(packet, header->caplen);
 	count ++;
+	printf("\n");
+//	print_payload(packet, header->caplen);
+	return;
+}
+
+void ether_handler(const u_char *packet, int len)
+{
+	const struct sniff_ethernet *ethernet;	/* The ethernet header  */
 	
 	/* define ethernet header */
 	ethernet = (struct sniff_ethernet*)(packet);
+	len -= SIZE_ETHERNET;
+	packet += SIZE_ETHERNET;
+
 	printf("	Ethernet II,Src:");
 	print_ether_addr(ethernet->ether_shost);
 	printf(", Dst: ");
@@ -278,16 +335,16 @@ void got_eth_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
 
 	switch(ntohs(ethernet->ether_type)) {
 		case ETHERTYPE_IP:
-			printf("IP\n");
-			got_ip_packet(packet, SIZE_ETHERNET);
+			printf("IP (0x%04x)\n", ETHERTYPE_IP);
+			ip_handler(packet, len);
 			break;
 		case ETHERTYPE_ARP:
 			printf("ARP\n");
-			//got_arp_packet(packet, SIZE_ETHERNET);
+			arp_handler(packet, len);
 			break;
 		case ETHERTYPE_REVARP:
 			printf("RARP\n");
-			//got_rarp_packet(packet, SIZE_ETHERNET);
+			rarp_handler(packet, SIZE_ETHERNET);
 			break;
 		case ETHERTYPE_PUP:
 			printf("Xeror PUP\n");
@@ -321,22 +378,19 @@ void got_eth_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
 	return;
 }
 
-void got_ip_packet(const u_char *packet, int iphdr_offset)
+void ip_handler(const u_char *packet, int len)
 {
 	
 	const struct sniff_ip *ip;				/*The IP header */
-	//const struct payload;					/* Packet payload */
 
 	int size_ip;
 
-	ip = (struct sniff_ip*)(packet + iphdr_offset);
-	
+	ip = (struct sniff_ip*)(packet);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
 		printf("	* Invalid IP header length: %u bytes\n", size_ip);
 		return;
 	}
-
     printf("	Version: %u\n", IP_V(ip));
 	printf("	header length: %u bytes\n", IP_HL(ip)*4);
 	printf("	Tos: 0x%02x\n", ip->ip_tos);
@@ -349,63 +403,134 @@ void got_ip_packet(const u_char *packet, int iphdr_offset)
 	printf("	Header checksum: 0x%04x\n", ntohs(ip->ip_sum));
 	printf("	From: %s\n", inet_ntoa(ip->ip_src));
 	printf("	  To: %s\n", inet_ntoa(ip->ip_dst));
+	packet += size_ip;
+	len -= size_ip;
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			printf("	TCP\n");
-			got_tcp_packet(packet, iphdr_offset + size_ip);
+			tcp_handler(packet, len);
 			break;
-		case IPPROTO_UDP:
+			case IPPROTO_UDP:
 			printf("	UDP\n");
+			udp_handler(packet, len);
+			break;
+		case IPPROTO_IP:
+			printf("	Dummy protocol for TCP\n");
+			break;
+		case IPPROTO_ICMP:
+			printf("	ICMP\n");
+			break;
+		case IPPROTO_IGMP:
+			printf("	IGMP\n");
+			break;
+		case IPPROTO_IPIP:
+			printf("	IPIP tunnels\n");
+			break;
+		case IPPROTO_EGP:
+			printf("	EGP\n");
+			break;
+		case IPPROTO_PUP:
+			printf("	PUP\n");
+			break;
+		case IPPROTO_IDP:
+			printf("	IDP\n");
+			break;
+		case IPPROTO_TP:
+			printf("	TP\n");
+			break;
+		case IPPROTO_DCCP:
+			printf("	DCCP\n");
+			break;
+		case IPPROTO_IPV6:
+			printf("	IPV6\n");
+			break;
+		case IPPROTO_RSVP:
+			printf("	RSVP\n");
+			break;
+		case IPPROTO_GRE:
+			printf("	GRE\n");
+			break;
+		case IPPROTO_ESP:
+			printf("	ESP\n");
+			break;
+		case IPPROTO_AH:
+			printf("	AH\n");
+			break;
+		case IPPROTO_MTP:
+			printf("	MTP\n");
+			break;
+		case IPPROTO_BEETPH:
+			printf("	BEETPH\n");
+			break;
+		case IPPROTO_ENCAP:
+			printf("	ENCAP\n");
+			break;
+		case IPPROTO_PIM:
+			printf("	PIM\n");
+			break;
+		case IPPROTO_COMP:
+			printf("	COMP\n");
+			break;
+		case IPPROTO_SCTP:
+			printf("	SCTP\n");
+			break;
+		case IPPROTO_UDPLITE:
+			printf("	UDPLITE\n");
+			break;
+		case IPPROTO_RAW:
+			printf("	Raw IP pakcet\n");
 			break;
 		default:
 			printf("	unkonwn\n");
 			break;
 	}
 	
-	print_payload(packet, ntohs(ip->ip_len) + iphdr_offset);
 	return;
 }
 
-void got_arp_pakcet(const u_char *packet, int arphdr_offset)
+void arp_handler(const u_char *packet, int len)
 {
-/*
 	const struct sniff_arp *arp;
 
-	arp = (struct sniff_arp*)(packet + arphdr_offset);
-	printf("Hardware type: 0x%04x\n", ntohs(arp->ar_hrd));
-	printf("Protocol type: 0x%04x\n", ntohs(arp->ar_pro));
-	printf("Hardware size: %u\n", arp->ar_hln);
-	printf("Protocol size: %u\n", arp->ar_pln);
-	printf("Opcode: %u\n", ntohs(arp->ar_op));
-	printf("Sender MAC address: ");
+	arp = (struct sniff_arp*)(packet);
+	printf("	Hardware type: 0x%04x\n", ntohs(arp->ar_hrd));
+	printf("	Protocol type: 0x%04x\n", ntohs(arp->ar_pro));
+	printf("	Hardware size: %u\n", arp->ar_hln);
+	printf("	Protocol size: %u\n", arp->ar_pln);
+	printf("	Opcode: %u\n", ntohs(arp->ar_op));
+#if 0
+	printf("	Sender MAC address: ");
 	print_ether_addr(arp->ar_sha);
-	printf("\nSender IP address: %s\n", inet_ntoa(arp->ar_sip));
-	printf("Target MAC address: ");
+	printf("\n	Sender IP address: %s\n", inet_ntoa(arp->ar_sip));
+	printf("	Target MAC address: ");
 	print_ether_addr(arp->ar_tha);
-	printf("\nTarget IP address: %s\n", inet_ntoa(arp->ar_tip));
-*/
+	printf("\n	Target IP address: %s\n", inet_ntoa(arp->ar_tip));
+#endif
 	return;
 }
 
-void got_rarp_packet(const u_char *packet, int rarphdr_offset)
+void rarp_handler(const u_char *packet, int len)
 {
 	return;
 }
 
-void got_tcp_packet(const u_char *packet, int tcphdr_offset)
+void tcp_handler(const u_char *packet, int len)
 {
 	const struct sniff_tcp *tcp;
-	const u_char *payload;
 
 	int size_tcp;
+	u_short sport;
+	u_short dport;
 
-	tcp = (struct sniff_tcp*)(packet + tcphdr_offset);
+	tcp = (struct sniff_tcp*)(packet);
 	size_tcp = TH_HL(tcp)*4;
 	if (size_tcp < 20) {
 		printf("	* Invalid TCP header length: %u bytes\n", size_tcp);
 		return;
 	}
 
+	sport = ntohs(tcp->th_sport);
+	dport = ntohs(tcp->th_dport);
 	printf("	Src port: %u\n", ntohs(tcp->th_sport));
 	printf("	Dst port: %u\n", ntohs(tcp->th_dport));
 	printf("	Sequence: %u\n", ntohl(tcp->th_seq));
@@ -415,6 +540,101 @@ void got_tcp_packet(const u_char *packet, int tcphdr_offset)
 	printf("	Window size: %u\n",ntohs(tcp->th_win));
 	printf("	Checksum: 0x%04x\n", ntohs(tcp->th_sum));
 	printf("	Urgent pointer: %u\n", ntohs(tcp->th_urp));
+
+	packet += size_tcp;
+	len -= size_tcp;
+
+	printf("	len: %d sport: %d dport: %d\n", len, sport, dport);
+	if(len <= 0)
+		return;
+	if(dport == 80) {
+		/*
+		 * if the first few letters meet the following requirement, 
+		 * it is a http packet.
+		 */
+		if(0 == strncmp(packet,"GET", 3)	 || 0 == strncmp(packet, "POST", 4)   ||
+		   0 == strncmp(packet, "HEAD", 4)	 || 0 == strncmp(packet, "OPTION", 6) ||
+		   0 == strncmp(packet, "PUT", 3)	 || 0 == strncmp(packet, "DELETE", 6) ||
+		   0 == strncmp(packet, "TRACE", 5)  || 0 == strncmp(packet, "CONNECT", 7)) {
+			printf("	HTTP\n");
+			http_handler(packet, 1, len);			// request packet
+		}
+		else {
+		printf("	TCP SEGMENT DATA: %d bytes\n", len);
+		}
+	}
+	else if (sport == 80) {
+		if(0 == strncmp(packet, "HTTP", 4)) {
+			printf("	HTTP\n");
+			http_handler(packet, 2, len);			// response packet
+		}
+		else {
+			printf("	TCP SEGMENT DATA: %d bytes\n", len);
+		}
+	}
+	else {
+
+	}
+	return;
+}
+
+void udp_handler(const u_char *packet, int len)
+{
+	const struct sniff_udp *udp;
+
+	int size_udp;
+	u_short sport;
+	u_short dport;
+
+	size_udp = sizeof(struct sniff_udp);
+	udp = (struct sniff_udp*)(packet);
+	sport = ntohs(udp->uh_sport);
+	dport = ntohs(udp->uh_dport);
+	printf("	Src port: %u\n", ntohs(udp->uh_sport));
+	printf("	Dst port: %u\n", ntohs(udp->uh_dport));
+	printf("	Total length: %u\n", ntohs(udp->uh_ulen));
+	printf("	Checksum: 0x%04x\n", ntohs(udp->uh_checksum));
+
+	return;
+}
+
+/*
+ * if a http packet is divided many parts, 
+ * the first is http packet, others are tcp packet
+ */
+void http_handler(const u_char *packet, int type, int len)
+{
+	typedef struct {
+		int len;
+		u_char data[0];
+	} buffer;
+    for(;;) {
+		int i;
+		for(i = 0; i < len - 1 && 0 != strncmp(packet + i, "\r\n", 2); i++);
+		if(i == len - 1) {						// a part of http packet 
+			i = len;
+		}	
+		buffer *line = (buffer*)malloc(sizeof(buffer) + i + 1);
+		memcpy(line->data, packet, i);
+		line->data[i] = '\0';
+		if(i == len) {							// http packet is truncated
+			printf("\t%s\n", line->data);
+			packet += len;
+			len = 0;
+			break;
+		}
+		else {
+			printf("\t%s\\r\\n\n", line->data);
+			packet += (i + 2);
+			len -= (i + 2);
+		}
+
+		if(0 == i){				// the line begin with "\r\n"
+			break;
+		}
+	}
+	print_payload(packet, len);
+
 	return;
 }
 
@@ -429,7 +649,7 @@ int main(int argc, char **argv)
 	struct bpf_program fp;			/* compiled filter program (expression) */
 	bpf_u_int32 mask;			/* subnet mask */
 	bpf_u_int32 net;			/* ip */
-	int num_packets = 30;			/* number of packets to capture */
+	int num_packets = -1;			/* number of packets to capture */
 
 	print_app_banner();
 
@@ -497,7 +717,7 @@ int main(int argc, char **argv)
 	}
 
 	/* now we can set our callback function */
-	pcap_loop(handle, num_packets, got_eth_packet, NULL);
+	pcap_loop(handle, num_packets, packet_handler, (u_char *)handle);
 
 	/* cleanup */
 	pcap_freecode(&fp);

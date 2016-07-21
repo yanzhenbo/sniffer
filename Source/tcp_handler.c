@@ -86,8 +86,9 @@ void tcp_handler(const u_char *packet, int len)
 		proto[TELNET_INDEX] ++;
 		telnet_handler(packet, len);
 	}
-	else {
-
+	else if(502 == dport || 502 == sport) {
+		proto[MODBUS_INDEX] ++;
+		modbus_handler(packet, len);	
 	}
 
 	return;

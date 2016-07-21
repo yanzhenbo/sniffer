@@ -12,6 +12,7 @@
 #define HTTP_INDEX 7
 #define FTP_INDEX 8
 #define TELNET_INDEX 9
+#define MODBUS_INDEX 10
 
 void proto_stat_print();
 #endif /* _STATISTIC_H_ */

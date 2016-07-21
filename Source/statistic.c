@@ -12,6 +12,6 @@ void proto_stat_print()
 	printf("\tHTTP\t%d\n", proto[HTTP_INDEX]);
 	printf("\tFTP\t%d\n", proto[FTP_INDEX]);
 	printf("\tTELNET\t%d\n", proto[TELNET_INDEX]);
-
+	printf("\tMODBUS\t%d\n", proto[MODBUS_INDEX]);
 	return;
 }

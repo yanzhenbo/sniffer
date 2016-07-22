@@ -7,7 +7,10 @@ void udp_handler(const u_char *packet, int len)
 	int size_udp;
 	u_short sport;
 	u_short dport;
-	printf("\tUDP\n");
+	if(vivid) {
+		printf("\n");
+	}
+	printf("        UDP ");
 	size_udp = sizeof(struct sniff_udp);
 	udp = (struct sniff_udp*)(packet);
 	sport = ntohs(udp->uh_sport);

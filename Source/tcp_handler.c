@@ -9,13 +9,17 @@ void tcp_handler(const u_char *packet, int len)
 	u_short sport;
 	u_short dport;
 	u_short flags;
+
+	if(vivid) {
+		printf("\n");
+	}
 	tcp = (struct sniff_tcp*)(packet);
 	size_tcp = TH_HL(tcp)*4;
 	if (size_tcp < 20) {
 		printf("	* Invalid TCP header length: %u bytes\n", size_tcp);
 		return;
 	}
-	printf("\tTCP\t");
+	printf("        TCP ");
 	sport = ntohs(tcp->th_sport);
 	dport = ntohs(tcp->th_dport);
 	flags = (ntohs(tcp->th_hl_flags))&TH_FLAGS;
@@ -28,13 +32,13 @@ void tcp_handler(const u_char *packet, int len)
 	if(flags&TH_ECE) printf("\tECE");
 	if(flags&TH_CWR) printf("\tCWR");
 	if(flags&TH_NS)  printf("\tNS");
-	printf("\n");
+	printf(" ");
 	if(vivid) {
-		printf("	Src port: %u\n", ntohs(tcp->th_sport));
+		printf("\n 	Src port: %u\n", ntohs(tcp->th_sport));
 		printf("	Dst port: %u\n", ntohs(tcp->th_dport));
 		printf("	Sequence: %u\n", ntohl(tcp->th_seq));
 		printf("	Ack: %u\n", ntohl(tcp->th_ack));
-		printf("	Header length: %u bytes\n", TH_HL(tcp)*4);
+		printf("	Header length: %u bytes\n", size_tcp);
 		printf("	Flags: 0x%03x\n", (ntohs(tcp->th_hl_flags))&TH_FLAGS);
 		printf("	Window size: %u\n",ntohs(tcp->th_win));
 		printf("	Checksum: 0x%04x\n", ntohs(tcp->th_sum));
@@ -43,9 +47,11 @@ void tcp_handler(const u_char *packet, int len)
 	packet += size_tcp;
 	len -= size_tcp;
 
-	printf("	App layer len: %d\n", len);
-	if(len <= 0)
+	printf("	Application layer len: %d\n", len);
+	if(len <= 0) {
+		printf("\n");
 		return;
+	}
 	if(80 == dport || 80 == sport) {
 		proto[HTTP_INDEX] ++;
 		if(80 == dport) {
@@ -57,7 +63,6 @@ void tcp_handler(const u_char *packet, int len)
 			   0 == strncmp(packet, "HEAD", 4)	 || 0 == strncmp(packet, "OPTION", 6) ||
 			   0 == strncmp(packet, "PUT", 3)	 || 0 == strncmp(packet, "DELETE", 6) ||
 			   0 == strncmp(packet, "TRACE", 5)  || 0 == strncmp(packet, "CONNECT", 7)) {
-				printf("	HTTP\n");
 				http_handler(packet, 1, len);			// request packet
 			}
 			else {
@@ -66,7 +71,6 @@ void tcp_handler(const u_char *packet, int len)
 		}
 		else if (80 == sport) {
 			if(0 == strncmp(packet, "HTTP", 4)) {
-				printf("	HTTP\n");
 				http_handler(packet, 2, len);			// response packet
 			}
 			else {
@@ -89,6 +93,10 @@ void tcp_handler(const u_char *packet, int len)
 	else if(502 == dport || 502 == sport) {
 		proto[MODBUS_INDEX] ++;
 		modbus_handler(packet, len);	
+	}
+	else {
+		proto[UNKNOWN_INDEX] ++;
+		printf("unknown protocol\n");
 	}
 
 	return;

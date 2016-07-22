@@ -1,12 +1,13 @@
 #include "../Include/ftp_handler.h"
 extern int vivid;
+extern int hex;
 void ftp_handler(const u_char *packet, int type, int len)
 {
 	typedef struct {
 		int len;
 		u_char data[0];
 	} buffer;
-	printf("	FTP\n");
+	printf("\tFTP\n");
 	if (1 == type ) {
 			int i;
 			for(i = 0; i < len - 1 && 0 != strncmp(packet + i, "\r\n", 2); i++);
@@ -36,6 +37,8 @@ void ftp_handler(const u_char *packet, int type, int len)
 	else {
 
 	}
-
+	if(hex) {
+		print_payload(packet, len);
+	}
 	return;
 }

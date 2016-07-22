@@ -152,6 +152,6 @@ int main(int argc, char **argv)
 	if(statistic) {
 		proto_stat_print();
 	}
-return 0;
+	return 0;
 }
 

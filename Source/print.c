@@ -47,7 +47,7 @@ void print_hex_ascii_line(const u_char *payload, int len, int offset)
 	const u_char *ch;
 
 	/* offset */
-	printf("0x%04x   ", offset);
+	printf("\t0x%04x   ", offset);
 	
 	/* hex */
 	ch = payload;

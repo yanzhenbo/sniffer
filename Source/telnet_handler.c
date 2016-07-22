@@ -1,5 +1,6 @@
 #include "../Include/telnet_handler.h"
 extern int vivid;
+extern int hex;
 char *telnet_command(u_char com_code)
 {
 	switch(com_code) {
@@ -148,5 +149,7 @@ void telnet_handler(const u_char *packet, int len)
 			}
 		}
 	}
-
+	if(hex) {
+		print_payload(packet, len);
+	}
 }

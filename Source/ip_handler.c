@@ -7,13 +7,19 @@ void ip_handler(const u_char *packet, int len)
 	const struct sniff_ip *ip;				/*The IP header */
 
 	int size_ip;
-
+	u_short ip_len;
+	
+	printf("IP ");
+	if(vivid) {
+		printf("\n");
+	}
 	ip = (struct sniff_ip*)(packet);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
 		printf("	* Invalid IP header length: %u bytes\n", size_ip);
 		return;
 	}
+	ip_len = ntohs(ip->ip_len);
 	if(vivid) {
 		printf("	Version: %u\n", IP_V(ip));
 	    printf("	header length: %u bytes\n", IP_HL(ip)*4);
@@ -26,16 +32,19 @@ void ip_handler(const u_char *packet, int len)
     	printf("	Protocal: %u\n", ip->ip_p);
     	printf("	Header checksum: 0x%04x\n", ntohs(ip->ip_sum));
 	}
-	printf("\tFrom: %s", inet_ntoa(ip->ip_src));
-	printf("\tTo: %s\n", inet_ntoa(ip->ip_dst));
+	if(vivid) {
+		printf("\t");
+	}
+	printf("From: %s", inet_ntoa(ip->ip_src));
+	printf(" To: %s ", inet_ntoa(ip->ip_dst));
 	packet += size_ip;
-	len -= size_ip;
+	len = ip_len - size_ip;
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			proto[TCP_INDEX] ++;
 			tcp_handler(packet, len);
 			break;
-			case IPPROTO_UDP:
+		case IPPROTO_UDP:
 			proto[UDP_INDEX] ++;
 			udp_handler(packet, len);
 			break;

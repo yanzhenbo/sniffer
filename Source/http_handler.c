@@ -1,11 +1,16 @@
 #include "../Include/http_handler.h"
 extern int vivid;
+extern int hex;
 void http_handler(const u_char *packet, int type, int len)
 {
 	typedef struct {
 		int len;
 		u_char data[0];
 	} buffer;
+	if(vivid) {
+		printf("\n");
+	}
+	printf("\tHTTP\n");
     for(;;) {
 		int i;
 		for(i = 0; i < len - 1 && 0 != strncmp(packet + i, "\r\n", 2); i++);
@@ -35,7 +40,8 @@ void http_handler(const u_char *packet, int type, int len)
 			break;
 		}
 	}
-	//print_payload(packet, len);
-
+	if(hex) {
+		print_payload(packet, len);
+	}
 	return;
 }

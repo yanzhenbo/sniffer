@@ -1,6 +1,6 @@
 #include "../Include/tcp_handler.h"
-extern int vivid;
-extern int proto[PROTO_CATEGORY];
+//extern int vivid;
+//extern int proto[PROTO_CATEGORY];
 void tcp_handler(const u_char *packet, int len)
 {
 	const struct sniff_tcp *tcp;
@@ -10,19 +10,16 @@ void tcp_handler(const u_char *packet, int len)
 	u_short dport;
 	u_short flags;
 
-	if(vivid) {
-		printf("\n");
-	}
 	tcp = (struct sniff_tcp*)(packet);
 	size_tcp = TH_HL(tcp)*4;
 	if (size_tcp < 20) {
 		printf("	* Invalid TCP header length: %u bytes\n", size_tcp);
 		return;
 	}
-	printf("        TCP ");
 	sport = ntohs(tcp->th_sport);
 	dport = ntohs(tcp->th_dport);
 	flags = (ntohs(tcp->th_hl_flags))&TH_FLAGS;
+#if 0
 	if(flags&TH_FIN) printf("\tFIN");
 	if(flags&TH_SYN) printf("\tSYN");
 	if(flags&TH_RST) printf("\tRST");
@@ -32,7 +29,6 @@ void tcp_handler(const u_char *packet, int len)
 	if(flags&TH_ECE) printf("\tECE");
 	if(flags&TH_CWR) printf("\tCWR");
 	if(flags&TH_NS)  printf("\tNS");
-	printf(" ");
 	if(vivid) {
 		printf("\n 	Src port: %u\n", ntohs(tcp->th_sport));
 		printf("	Dst port: %u\n", ntohs(tcp->th_dport));
@@ -44,16 +40,18 @@ void tcp_handler(const u_char *packet, int len)
 		printf("	Checksum: 0x%04x\n", ntohs(tcp->th_sum));
 		printf("	Urgent pointer: %u\n", ntohs(tcp->th_urp));
 	}
+#endif
 	packet += size_tcp;
 	len -= size_tcp;
 
-	printf("	Application layer len: %d\n", len);
+	//printf("	Application layer len: %d\n", len);
 	if(len <= 0) {
-		printf("\n");
+		//printf("\n");
 		return;
 	}
+
 	if(80 == dport || 80 == sport) {
-		proto[HTTP_INDEX] ++;
+		//proto[HTTP_INDEX] ++;
 		if(80 == dport) {
 			/*
 			 * if the first few letters meet the following requirement, 
@@ -79,24 +77,24 @@ void tcp_handler(const u_char *packet, int len)
 		}
 	}
 	else if(20 == dport || 20 == sport) {
-		proto[FTP_INDEX] ++;
+		//proto[FTP_INDEX] ++;
 		ftp_handler(packet, 2, len);
 	}
 	else if(21 == dport || 21 == sport) {
-		proto[FTP_INDEX] ++;
+		//proto[FTP_INDEX] ++;
 		ftp_handler(packet, 1, len);
 	}
 	else if(23 == dport || 23 == sport) {
-		proto[TELNET_INDEX] ++;
+		//proto[TELNET_INDEX] ++;
 		telnet_handler(packet, len);
 	}
 	else if(502 == dport || 502 == sport) {
-		proto[MODBUS_INDEX] ++;
+		//proto[MODBUS_INDEX] ++;
 		modbus_handler(packet, len);	
 	}
 	else {
-		proto[UNKNOWN_INDEX] ++;
-		printf("unknown protocol\n");
+		//proto[UNKNOWN_INDEX] ++;
+		//printf("unknown protocol\n");
 	}
 
 	return;

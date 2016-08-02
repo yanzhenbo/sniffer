@@ -1,6 +1,7 @@
 #ifndef _PACKET_HANDLER_H_
 #define _PACKET_HANDLER_H_ 1
-#include "../Include/ether_handler.h"
+#include "ether_handler.h"
+#include "mysql_handler.h"
 #include <pcap.h>
 #include <stdio.h>
 #include <sys/socket.h>

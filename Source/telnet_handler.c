@@ -1,6 +1,14 @@
 #include "../Include/telnet_handler.h"
-extern int vivid;
-extern int hex;
+//extern int vivid;
+//extern int hex;
+
+extern struct recorder myRecorder;
+extern MYSQL mysql;
+extern MYSQL_RES *res;
+extern MYSQL_ROW row;
+extern char query[200];
+extern char table_name[50];
+
 char *telnet_command(u_char com_code)
 {
 	switch(com_code) {
@@ -89,8 +97,9 @@ char *telnet_option(u_char opt_code)
 }
 void telnet_handler(const u_char *packet, int len)
 {
-	printf("	TELNET\n");
-	if(vivid) return;
+	//printf("	TELNET\n");
+	memcpy(myRecorder.protocol_type, "TELNET\0", 7);
+#if 0
 	typedef struct {
 		int len;
 		char data[0];
@@ -152,4 +161,15 @@ void telnet_handler(const u_char *packet, int len)
 	if(hex) {
 		print_payload(packet, len);
 	}
+#endif
+
+
+	int t = insert(&mysql, table_name, myRecorder);
+	if(t) {
+		printf("执行显示时出现异常：%s", mysql_error(&mysql));
+	}
+	else {
+		printf("插入成功\n");
+	}
+	
 }

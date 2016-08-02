@@ -1,10 +1,10 @@
 #ifndef _TCP_HANDLER_H_
 #define _TCP_HANDLER_H_ 1
 
-#include "../Include/http_handler.h"
-#include "../Include/telnet_handler.h"
-#include "../Include/ftp_handler.h"
-#include "../Include/statistic.h"
+#include "http_handler.h"
+#include "telnet_handler.h"
+#include "ftp_handler.h"
+#include "statistic.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

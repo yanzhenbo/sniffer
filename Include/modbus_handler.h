@@ -1,5 +1,6 @@
 #ifndef _MODBUS_HANDLER_H_
 #define _MODBUS_HANDLER_H_ 1
+#include "mysql_handler.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

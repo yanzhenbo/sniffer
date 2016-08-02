@@ -16,6 +16,7 @@
 #include "../Include/print.h"
 #include "../Include/packet_handler.h"
 #include "../Include/statistic.h"
+#include "../Include/mysql_handler.h"
 #include <pcap.h>	/* pcap_t, PCAP_ERRBUF_SIZE, */
 #include <pcap/bpf.h>	/* bpf_u_int32, struct bpf_program*/
 #include <stdio.h>
@@ -28,13 +29,29 @@
 /* default snap length (maximum bytes per packet to capture) */
 #define SNAP_LEN 1518
 
-int vivid = 0;
-int hex = 0;
-int statistic = 0;
+//int vivid = 0;
+//int hex = 0;
+//int statistic = 0;
+
+MYSQL mysql;
+MYSQL_RES *res;
+MYSQL_ROW row;
+char query[200];
+char table_name[50];
+struct recorder  myRecorder;
 
 int main(int argc, char **argv)
 {
-
+	mysql_init(&mysql);
+	if(!mysql_real_connect(&mysql, "10.10.28.158", "auditroot", "123456", "audit", 0, NULL, 0)) {
+		printf("Error connecting to database: %s", mysql_error(&mysql));
+		return 1;
+	}
+	else {
+		printf("Connected...\n");
+	}
+	//table_name[50] = "packet_statistics";
+	strncpy(table_name, "packet_statistics", strlen("packet_statistics"));
 	char *dev = NULL;			/* capture device name */
 	char errbuf[PCAP_ERRBUF_SIZE];		/* error buffer */
 	pcap_t *handle;				/* packet capture handle */
@@ -68,13 +85,13 @@ int main(int argc, char **argv)
 		switch(opt) {
 			case   0: break;
 			case 's':
-				statistic = 1;
+				//statistic = 1;
 				break;
 			case 'x':
-				hex = 1;
+				//hex = 1;
 				break;
 			case 'v':
-				vivid = 1;
+				//vivid = 1;
 				break;
 			case 'i': 
 				dev = optarg;
@@ -94,7 +111,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//print_app_banner();
 	if (argc == 1) {
 		print_app_usage();
 		exit(EXIT_FAILURE);
@@ -147,11 +163,10 @@ int main(int argc, char **argv)
 	pcap_freecode(&fp);
 	pcap_close(handle);
 
+	mysql_free_result(res);
+	mysql_close(&mysql);
 	printf("\n\tCapture complete.\n");
 
-	if(statistic) {
-		proto_stat_print();
-	}
 	return 0;
 }
 

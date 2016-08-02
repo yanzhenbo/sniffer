@@ -5,9 +5,10 @@ objects = sniffer.o packet_handler.o ether_handler.o arp_handler.o \
 		  http_handler.o ftp_handler.o telnet_handler.o \
 		  print.o statistic.o \
 		  modbus_handler.o \
+		  mysql_handler.o \
 
 sniffer: $(objects)
-	@gcc -o sniffer $(objects) -lpcap;
+	@gcc -o sniffer -I/usr/include/mysql $(objects) -L/usr/lib/mysql -lmysqlclient -lpcap;
 
 sniffer.o: sniffer.c
 %.o: %.h

@@ -1,5 +1,6 @@
 #ifndef _HTTP_HANDLER_H_
 #define _HTTP_HANDLER_H_ 1
+#include "mysql_handler.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

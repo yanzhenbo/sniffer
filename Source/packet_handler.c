@@ -1,9 +1,18 @@
 #include "../Include/packet_handler.h"
-extern int hex;
-extern int statistic;
-extern int vivid;
+//extern int hex;
+//extern int statistic;
+//extern int vivid;
+extern struct recorder myRecorder;
+
 void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 {
+    myRecorder.time = header->ts.tv_sec + (double)(header->ts.tv_usec)/1000000;
+    ether_handler(packet, header->caplen);
+    return;
+}
+
+#if 0
+
 	static int count = 1;
 	static double begin_time;
 	struct pcap_stat pkt_stat;
@@ -33,3 +42,4 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char
 #endif
 	return;
 }
+#endif
